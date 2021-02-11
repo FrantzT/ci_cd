@@ -1,0 +1,59 @@
+node {
+    git 'https://github.com/FrantzT/todobackend.git'
+
+    try {
+        stage 'Run unit/integration tests'
+        sh 'make test'
+
+        stage 'Build application artefacts'
+        sh 'make build'
+
+        stage 'Create release environment and run acceptance tests'
+        sh 'make release'
+
+        stage 'Tag and publish release image'
+        sh "make tag latest \$(git rev-parse --short HEAD) \$(git tag --points-at HEAD"
+        sh "make buildtag master \$(git tag --points-at HEAD)"
+        withEnv(["DOCKER_USER=${DOCKER_USER}",
+                 "DOCKER_PASSWORD=${DOCKER_PASSWORD}",
+                 "DOCKER_EMAIL=${DOCKER_EMAIL}"]){
+            sh "make login"
+        }
+
+        sh "make publish"
+    }
+    finally {
+        stage 'Collect test reports'
+        step([$class: 'JUnitResultArchiver', testResult: '**/reports/*.xml'])
+
+        stage 'Clean up'
+        sh 'make clean'
+        sh 'make logout'
+    }
+}
+
+
+ARG DOCKER_ENGINE=1.10.2
+ARG DOCKER_COMPOSE=1.6.2
+
+RUN apt-get update && apt-get install -y ruby curl python-dev python-setuptools gcc make libssl-dev -y && \
+    easy_install pip
+
+RUN apt-get install \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    gnupg-agent \
+    software-properties-common
+
+RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+
+RUN add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+
+RUN apt-get update && \
+    apt-get install docker-ce docker-ce-cli containerd.io -y && \
+    usermod -aG docker jenkins && \
+    usermod -aG users jenkins
+
+RUN pip install docker-compose==${DOCKER_COMPOSE:-1.6.2} && \
+    pip install ansible boto boto3

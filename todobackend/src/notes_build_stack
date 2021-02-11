@@ -1,0 +1,11 @@
+in /todobackend-base
+
+docker build -t pawelzaatdocker/todobackend-base .
+
+# just for test
+docker build -t todobackend-dev -f docker/dev/Dockerfile .
+
+in /docker-ansible
+
+docker build -t pawelzaatdocker/ansible .
+
